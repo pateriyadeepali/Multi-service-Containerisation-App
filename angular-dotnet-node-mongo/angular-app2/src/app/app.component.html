@@ -1,0 +1,14 @@
+<h1>Angular Frontend Demo</h1>
+
+<!-- Buttons to select backend -->
+<button (click)="fetchData('students')">Fetch Students Data</button>
+<button (click)="fetchData('weather')">Fetch Weather Data</button>
+
+<!-- Show loading indicator -->
+<div *ngIf="loading">Loading...</div>
+
+<!-- Show data -->
+<div *ngIf="data">
+  <h3>Response:</h3>
+  <pre>{{ data | json }}</pre>
+</div>

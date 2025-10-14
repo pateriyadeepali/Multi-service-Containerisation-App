@@ -1,0 +1,61 @@
+version: "3.9"
+
+services:
+  mongo-db:
+    image: mongo:latest
+    container_name: mongo-db
+    networks:
+      - my-net
+    ports:
+      - "27017:27017"
+    environment:
+      MONGO_INITDB_DATABASE: studentsdb
+      MONGO_INITDB_ROOT_USERNAME: admin
+      MONGO_INITDB_ROOT_PASSWORD: secret123
+    restart: always
+ 
+    volumes:
+      - mongo_data:/data/db
+
+  dotnet-backend:
+    image: dotnet-backend
+    container_name: dotnet-backend
+    networks:
+      - my-net
+    ports:
+      - "5258:5258"
+    environment:
+      ASPNETCORE_URLS: http://+:5258
+    restart: always
+
+  node-backend:
+    image: node-backend
+    container_name: node-backend
+    networks:
+      - my-net
+    ports:
+      - "4000:4000"
+    depends_on:
+      - mongo-db
+    restart: always
+
+  angular-frontend:
+    image: angular-frontend
+    container_name: angular-frontend
+    networks:
+      - my-net
+    ports:
+      - "80:80"
+    depends_on:
+      - dotnet-backend
+      - node-backend
+    restart: always
+
+networks:
+  my-net:
+    driver: bridge
+
+volumes:
+  mongo_data:
+  mongo_config:
+
