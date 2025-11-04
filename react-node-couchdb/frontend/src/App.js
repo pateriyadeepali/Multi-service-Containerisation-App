@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import "./App.css";
 
 const API_URL = process.env.REACT_APP_API_URL || "http://backend:5000";
 
@@ -7,23 +8,28 @@ function App() {
   const [author, setAuthor] = useState("");
   const [year, setYear] = useState("");
   const [books, setBooks] = useState([]);
+  const [loading, setLoading] = useState(false);
 
   // Fetch books from backend
   useEffect(() => {
+    setLoading(true);
     fetch(`${API_URL}/all`)
       .then((res) => res.json())
       .then((data) => {
         if (Array.isArray(data)) setBooks(data);
         else console.error("Unexpected response:", data);
       })
-      .catch((err) => console.error("Error fetching books:", err));
+      .catch((err) => console.error("Error fetching books:", err))
+      .finally(() => setLoading(false));
   }, []);
 
   // Handle form submit
   const handleSubmit = async (e) => {
     e.preventDefault();
-    const newBook = { bookName, author, year };
+    if (!bookName || !author || !year) return;
 
+    const newBook = { bookName, author, year };
+    setLoading(true);
     try {
       const res = await fetch(`${API_URL}/add`, {
         method: "POST",
@@ -42,31 +48,35 @@ function App() {
       }
     } catch (err) {
       console.error("Error adding book:", err);
+    } finally {
+      setLoading(false);
     }
   };
 
   // Delete book
   const handleDelete = async (id) => {
+    setLoading(true);
     try {
       await fetch(`${API_URL}/delete/${id}`, { method: "DELETE" });
       setBooks((prevBooks) => prevBooks.filter((b) => b._id !== id));
     } catch (err) {
       console.error("Error deleting book:", err);
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
-    <div style={{ maxWidth: "800px", margin: "20px auto", textAlign: "center" }}>
-      <h1>Book Store Application</h1>
+    <div className="app-container">
+      <h1 className="title"> Book Store Application</h1>
 
-      <form onSubmit={handleSubmit} style={{ marginBottom: "20px" }}>
+      <form onSubmit={handleSubmit} className="form-container">
         <input
           type="text"
           placeholder="Book Name"
           value={bookName}
           onChange={(e) => setBookName(e.target.value)}
           required
-          style={{ padding: "8px", margin: "5px" }}
         />
         <input
           type="text"
@@ -74,7 +84,6 @@ function App() {
           value={author}
           onChange={(e) => setAuthor(e.target.value)}
           required
-          style={{ padding: "8px", margin: "5px" }}
         />
         <input
           type="number"
@@ -82,14 +91,15 @@ function App() {
           value={year}
           onChange={(e) => setYear(e.target.value)}
           required
-          style={{ padding: "8px", margin: "5px" }}
         />
-        <button type="submit" style={{ padding: "10px 15px", margin: "5px" }}>
-          Add Book
+        <button type="submit" className="btn-add" disabled={loading}>
+          {loading ? "Adding..." : "Add Book"}
         </button>
       </form>
 
-      <table border="1" cellPadding="10" style={{ width: "100%", marginTop: "20px" }}>
+      {loading && <p className="loading-text"> Loading...</p>}
+
+      <table className="book-table">
         <thead>
           <tr>
             <th>Book Name</th>
@@ -108,9 +118,10 @@ function App() {
                 <td>
                   <button
                     onClick={() => handleDelete(book._id)}
-                    style={{ background: "red", color: "white", padding: "5px 10px" }}
+                    className="btn-delete"
+                    disabled={loading}
                   >
-                    Delete
+                     Delete
                   </button>
                 </td>
               </tr>
