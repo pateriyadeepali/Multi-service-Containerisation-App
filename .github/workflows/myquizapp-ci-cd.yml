@@ -1,41 +1,3 @@
-name: My-Quiz-App CI/CD
-
-on:
-  push:
-    branches:
-      - main
-    paths:
-      - 'My-Quiz-App/**'
-  workflow_dispatch:
-
-jobs:
-  build-and-push:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v2
-
-      - name: Log in to Docker Hub
-        uses: docker/login-action@v2
-        with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
-
-      - name: Build & push backend image
-        working-directory: My-Quiz-App/quiz-backend
-        run: |
-          docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/myquizapp-backend:latest .
-          docker push ${{ secrets.DOCKERHUB_USERNAME }}/myquizapp-backend:latest
-
-      - name: Build & push frontend image
-        working-directory: My-Quiz-App/quiz_frontend
-        run: |
-          docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/myquizapp-frontend:latest .
-          docker push ${{ secrets.DOCKERHUB_USERNAME }}/myquizapp-frontend:latest
-
   deploy-to-azure-vm:
     needs: build-and-push
     runs-on: ubuntu-latest
@@ -55,48 +17,49 @@ jobs:
           DOCKER_USER: ${{ secrets.DOCKERHUB_USERNAME }}
         run: |
           echo "🔗 Connecting to $VM_HOST as $VM_USER ..."
-          ssh -o StrictHostKeyChecking=no $VM_USER@$VM_HOST <<'EOF'
-            set -e  # exit on first error
-            export VM_USER="${{ secrets.AZURE_VM_USERNAME }}"
-            export DOCKER_USER="${{ secrets.DOCKERHUB_USERNAME }}"
+          ssh -o StrictHostKeyChecking=no $VM_USER@$VM_HOST bash -s <<EOF
+set -e
 
-            echo "✅ Logged in as $(whoami)"
-            echo "👤 Workflow VM_USER: $VM_USER"
+echo "✅ Logged in as \$(whoami)"
+echo "👤 VM user variable received: $VM_USER"
+echo "🐳 Docker user: $DOCKER_USER"
 
-            # Ensure Docker exists
-            if ! command -v docker &> /dev/null; then
-              echo "Installing Docker..."
-              sudo apt-get update -y
-              sudo apt-get install -y docker.io docker-compose-plugin
-              sudo systemctl enable docker
-              sudo systemctl start docker
-            fi
+# Ensure Docker is installed
+if ! command -v docker &> /dev/null; then
+  echo "Installing Docker..."
+  sudo apt-get update -y
+  sudo apt-get install -y docker.io docker-compose-plugin
+  sudo systemctl enable docker
+  sudo systemctl start docker
+fi
 
-            # Prepare working directory
-            WORK_DIR="/home/$VM_USER/myquizapp"
-            echo "📂 Using working directory: $WORK_DIR"
-            sudo mkdir -p $WORK_DIR
-            sudo chown -R $VM_USER:$VM_USER $WORK_DIR
-            cd $WORK_DIR
+WORK_DIR="/home/$VM_USER/myquizapp"
+echo "📂 Using working directory: \$WORK_DIR"
+sudo mkdir -p \$WORK_DIR
+sudo chown -R \$VM_USER:\$VM_USER \$WORK_DIR
+cd \$WORK_DIR
 
-            # Generate docker-compose.yml
-            cat > docker-compose.yml <<EOC
-            version: "3.9"
-            services:
-              backend:
-                image: $DOCKER_USER/myquizapp-backend:latest
-                ports:
-                  - "8010:8000"
-              frontend:
-                image: $DOCKER_USER/myquizapp-frontend:latest
-                ports:
-                  - "8081:80"
-            EOC
+# Create docker-compose.yml fresh
+cat > docker-compose.yml <<'EOC'
+version: "3.9"
+services:
+  backend:
+    image: __DOCKER_USER__/myquizapp-backend:latest
+    ports:
+      - "8010:8000"
+  frontend:
+    image: __DOCKER_USER__/myquizapp-frontend:latest
+    ports:
+      - "8081:80"
+EOC
 
-            echo "🛠️ Pulling and starting containers..."
-            docker compose pull
-            docker compose up -d --remove-orphans
+# Replace placeholder with actual docker username
+sed -i "s|__DOCKER_USER__|$DOCKER_USER|g" docker-compose.yml
 
-            echo "✅ Deployment complete. Running containers:"
-            docker ps
-          EOF
+echo "🛠️ Pulling and starting containers..."
+docker compose pull
+docker compose up -d --remove-orphans
+
+echo "Deployment complete. Running containers:"
+docker ps
+EOF
