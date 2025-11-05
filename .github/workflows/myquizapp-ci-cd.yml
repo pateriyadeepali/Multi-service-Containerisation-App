@@ -55,12 +55,15 @@ jobs:
           DOCKER_USER: ${{ secrets.DOCKERHUB_USERNAME }}
         run: |
           echo "🔗 Connecting to $VM_HOST as $VM_USER ..."
-          ssh -o StrictHostKeyChecking=no $VM_USER@$VM_HOST <<EOF
-            set -e  # Exit immediately on any error
+          ssh -o StrictHostKeyChecking=no $VM_USER@$VM_HOST <<'EOF'
+            set -e  # exit on first error
+            export VM_USER="${{ secrets.AZURE_VM_USERNAME }}"
+            export DOCKER_USER="${{ secrets.DOCKERHUB_USERNAME }}"
 
-            echo "✅ Logged in as \$(whoami)"
-            
-            # Ensure Docker is installed
+            echo "✅ Logged in as $(whoami)"
+            echo "👤 Workflow VM_USER: $VM_USER"
+
+            # Ensure Docker exists
             if ! command -v docker &> /dev/null; then
               echo "Installing Docker..."
               sudo apt-get update -y
@@ -69,14 +72,14 @@ jobs:
               sudo systemctl start docker
             fi
 
-            # Create working directory for deployment
+            # Prepare working directory
             WORK_DIR="/home/$VM_USER/myquizapp"
-            echo "📂 Using directory: \$WORK_DIR"
-            sudo mkdir -p \$WORK_DIR
-            sudo chown -R \$VM_USER:\$VM_USER \$WORK_DIR
-            cd \$WORK_DIR
+            echo "📂 Using working directory: $WORK_DIR"
+            sudo mkdir -p $WORK_DIR
+            sudo chown -R $VM_USER:$VM_USER $WORK_DIR
+            cd $WORK_DIR
 
-            # Create docker-compose.yml dynamically
+            # Generate docker-compose.yml
             cat > docker-compose.yml <<EOC
             version: "3.9"
             services:
@@ -90,10 +93,10 @@ jobs:
                   - "8081:80"
             EOC
 
-            echo "Pulling and starting containers..."
+            echo "🛠️ Pulling and starting containers..."
             docker compose pull
             docker compose up -d --remove-orphans
 
-            echo "Deployment complete. Running containers:"
+            echo "✅ Deployment complete. Running containers:"
             docker ps
           EOF
