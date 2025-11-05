@@ -52,32 +52,48 @@ jobs:
         env:
           VM_HOST: ${{ secrets.AZURE_VM_HOST }}
           VM_USER: ${{ secrets.AZURE_VM_USERNAME }}
+          DOCKER_USER: ${{ secrets.DOCKERHUB_USERNAME }}
         run: |
-          ssh -o StrictHostKeyChecking=no $VM_USER@$VM_HOST << 'EOF'
-            # Ensure the directory exists or create it with sudo, then change to it
-            sudo mkdir -p /home/${{ secrets.AZURE_VM_USERNAME }}/myquizapp
-            sudo chown -R ${{ secrets.AZURE_VM_USERNAME }}:${{ secrets.AZURE_VM_USERNAME }} /home/${{ secrets.AZURE_VM_USERNAME }}/myquizapp
-            cd /home/${{ secrets.AZURE_VM_USERNAME }}/myquizapp
+          ssh -o StrictHostKeyChecking=no $VM_USER@$VM_HOST << "EOF"
+            set -e  # Exit on first error
 
-            # Write docker-compose.yml if not present
-            if [ ! -f docker-compose.yml ]; then
-              cat <<EOC > docker-compose.yml
-              version: "3"
-              services:
-                backend:
-                  image: ${{ secrets.DOCKERHUB_USERNAME }}/myquizapp-backend:latest
-                  ports:
-                    - "8010:8000"
-                frontend:
-                  image: ${{ secrets.DOCKERHUB_USERNAME }}/myquizapp-frontend:latest
-                  ports:
-                    - "8081:80"
-              EOC
+            echo " Connected to Azure VM as $USER"
+
+            # Ensure Docker is available
+            if ! command -v docker &> /dev/null; then
+              echo "Installing Docker..."
+              sudo apt-get update
+              sudo apt-get install -y docker.io docker-compose
+              sudo systemctl enable docker
+              sudo systemctl start docker
             fi
 
-            # Pull and deploy the containers
+            # Prepare working directory
+            WORK_DIR="/home/$USER/myquizapp"
+            echo " Using working directory: $WORK_DIR"
+            sudo mkdir -p $WORK_DIR
+            sudo chown -R $USER:$USER $WORK_DIR
+            cd $WORK_DIR
+
+            # Create docker-compose.yml
+            cat > docker-compose.yml <<EOC
+            version: "3.9"
+            services:
+              backend:
+                image: ${DOCKER_USER}/myquizapp-backend:latest
+                ports:
+                  - "8010:8000"
+              frontend:
+                image: ${DOCKER_USER}/myquizapp-frontend:latest
+                ports:
+                  - "8081:80"
+            EOC
+
+            echo "🛠️ Pulling and starting containers..."
             docker compose pull
             docker compose up -d --remove-orphans
+
+            echo "Deployment complete. Running containers:"
             docker ps
           EOF
 
