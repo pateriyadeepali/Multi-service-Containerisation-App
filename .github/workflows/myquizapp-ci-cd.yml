@@ -1,3 +1,5 @@
+name: My-Quiz-App CI/CD
+
 on:
   push:
     branches:
@@ -52,7 +54,8 @@ jobs:
           VM_USER: ${{ secrets.AZURE_VM_USERNAME }}
         run: |
           ssh -o StrictHostKeyChecking=no $VM_USER@$VM_HOST << 'EOF'
-            cd /home/${VM_USER}/myquizapp || mkdir -p /home/${VM_USER}/myquizapp && cd /home/${VM_USER}/myquizapp
+            # Navigate to /home/<VM_USER>/myquizapp or create the directory with sudo if not present
+            cd /home/${{ secrets.AZURE_VM_USERNAME }}/myquizapp || sudo mkdir -p /home/${{ secrets.AZURE_VM_USERNAME }}/myquizapp && cd /home/${{ secrets.AZURE_VM_USERNAME }}/myquizapp
 
             # Write docker-compose.yml if not present (optional)
             if [ ! -f docker-compose.yml ]; then
@@ -70,7 +73,9 @@ jobs:
               EOC
             fi
 
+            # Pull and deploy containers
             docker compose pull
             docker compose up -d --remove-orphans
             docker ps
           EOF
+
