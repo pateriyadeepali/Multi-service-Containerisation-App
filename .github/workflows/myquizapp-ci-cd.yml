@@ -23,13 +23,13 @@ jobs:
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: Build & push backend image
-        working-directory: My-Quiz-App/backend
+        working-directory: My-Quiz-App/quiz-backend
         run: |
           docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/myquizapp-backend:latest .
           docker push ${{ secrets.DOCKERHUB_USERNAME }}/myquizapp-backend:latest
 
       - name: Build & push frontend image
-        working-directory: My-Quiz-App/frontend
+        working-directory: My-Quiz-App/quiz_frontend
         run: |
           docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/myquizapp-frontend:latest .
           docker push ${{ secrets.DOCKERHUB_USERNAME }}/myquizapp-frontend:latest
@@ -62,11 +62,11 @@ jobs:
                 backend:
                   image: ${{ secrets.DOCKERHUB_USERNAME }}/myquizapp-backend:latest
                   ports:
-                    - "5000:5000"
+                    - "8010:8000"
                 frontend:
                   image: ${{ secrets.DOCKERHUB_USERNAME }}/myquizapp-frontend:latest
                   ports:
-                    - "80:80"
+                    - "8081:80"
               EOC
             fi
 
