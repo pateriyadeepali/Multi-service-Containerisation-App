@@ -1,7 +1,7 @@
-name: My-Quiz-App CI/CD
-
 on:
   push:
+    branches:
+      - main
     paths:
       - 'My-Quiz-App/**'
   workflow_dispatch:
