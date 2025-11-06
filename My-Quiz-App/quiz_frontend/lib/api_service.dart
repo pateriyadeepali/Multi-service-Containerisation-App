@@ -3,7 +3,7 @@ import 'package:http/http.dart' as http;
 import 'models.dart';
 
 class ApiService {
-  static const String baseUrl = 'http://4.236.133.92:8010'; 
+  static const String baseUrl = 'http://4.236.133.92:8010/quizzes'; 
 
   // Fetch all quizzes
   Future<List<Quiz>> getQuizzes() async {
