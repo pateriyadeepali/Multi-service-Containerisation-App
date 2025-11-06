@@ -43,9 +43,6 @@ jobs:
       VM_HOST: ${{ secrets.AZURE_VM_HOST }}
       VM_USER: ${{ secrets.AZURE_VM_USERNAME }}
     steps:
-      - name: Install SSH client
-        run: sudo apt-get update && sudo apt-get install -y openssh-client git
-
       - name: Start ssh-agent
         uses: webfactory/ssh-agent@v0.9.0
         with:
@@ -55,25 +52,31 @@ jobs:
         run: |
           ssh -o StrictHostKeyChecking=no $VM_USER@$VM_HOST << EOF
             set -e
+            cd /home/$VM_USER
 
-            # Clone or update your repo
-            if [ ! -d "/home/$VM_USER/Multi-service-Containerization-App" ]; then
+            # If repo doesn't exist, clone it. Otherwise, update it.
+            if [ ! -d "Multi-service-Containerization-App" ]; then
+              echo "Cloning repository..."
               git clone https://github.com/pateriyadeepali/Multi-service-Containerization-App.git
             else
-              cd /home/$VM_USER/Multi-service-Containerization-App
+              echo "Updating existing repository..."
+              cd Multi-service-Containerization-App
+              git reset --hard
               git pull origin main
             fi
 
-            # Navigate to your app folder
+            # Move to project folder and deploy
             cd /home/$VM_USER/Multi-service-Containerization-App/My-Quiz-App
 
-            # Ensure Docker Compose is available
+            # Ensure docker compose plugin is installed
             if ! docker compose version >/dev/null 2>&1; then
-              sudo apt-get update && sudo apt-get install docker-compose-plugin -y
+              sudo apt-get update && sudo apt-get install -y docker-compose-plugin
             fi
 
-            # Pull and restart containers
+            echo "Pulling new images and restarting containers..."
             sudo docker compose pull
             sudo docker compose up -d --remove-orphans
+
+            echo "Running containers:"
             sudo docker ps
           EOF
