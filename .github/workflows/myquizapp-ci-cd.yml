@@ -43,20 +43,23 @@ jobs:
       VM_HOST: ${{ secrets.AZURE_VM_HOST }}
       VM_USER: ${{ secrets.AZURE_VM_USERNAME }}
     steps:
-      - name: Start ssh-agent
+      - name: Start SSH agent
         uses: webfactory/ssh-agent@v0.9.0
         with:
           ssh-private-key: ${{ secrets.AZURE_VM_SSH_KEY }}
 
       - name: Deploy to Azure VM
         run: |
-          ssh -o StrictHostKeyChecking=no $VM_USER@$VM_HOST << EOF
+          ssh -o StrictHostKeyChecking=no $VM_USER@$VM_HOST << 'EOF'
             set -e
+            echo "=============================="
+            echo "Starting Deployment Process"
+            echo "=============================="
+
             cd /home/$VM_USER
 
-            # If repo doesn't exist, clone it. Otherwise, update it.
             if [ ! -d "Multi-service-Containerization-App" ]; then
-              echo "Cloning repository..."
+              echo "Cloning repository for the first time..."
               git clone https://github.com/pateriyadeepali/Multi-service-Containerization-App.git
             else
               echo "Updating existing repository..."
@@ -65,18 +68,23 @@ jobs:
               git pull origin main
             fi
 
-            # Move to project folder and deploy
             cd /home/$VM_USER/Multi-service-Containerization-App/My-Quiz-App
 
-            # Ensure docker compose plugin is installed
-            if ! docker compose version >/dev/null 2>&1; then
-              sudo apt-get update && sudo apt-get install -y docker-compose-plugin
-            fi
+            echo "Cleaning old Docker resources..."
+            sudo docker system prune -af || true
 
-            echo "Pulling new images and restarting containers..."
+            echo "⬇Pulling latest images from Docker Hub..."
             sudo docker compose pull
+
+            echo "Recreating containers with latest versions..."
             sudo docker compose up -d --remove-orphans
 
-            echo "Running containers:"
-            sudo docker ps
+            echo "Active containers after deployment:"
+            sudo docker ps --format "table {{.Names}}\t{{.Image}}\t{{.Status}}\t{{.Ports}}"
+
+            echo "Logging deployment timestamp..."
+            mkdir -p /home/$VM_USER/deploy-logs
+            echo "Deployment completed at: $(date)" >> /home/$VM_USER/deploy-logs/deploy-$(date +'%Y%m%d-%H%M').log
+
+            echo "Deployment Successful!"
           EOF
