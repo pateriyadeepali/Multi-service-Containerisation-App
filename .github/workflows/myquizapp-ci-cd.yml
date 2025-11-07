@@ -12,28 +12,28 @@ jobs:
   build-and-push:
     runs-on: ubuntu-latest
     steps:
-      - name: 🧾 Checkout code
+      - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: 🧱 Set up Docker Buildx
+      - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
 
-      - name: 🔐 Log in to Docker Hub
+      - name: Log in to Docker Hub
         uses: docker/login-action@v2
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: 🏗️ Build & push backend image
+      - name: Build & push backend image
         working-directory: My-Quiz-App/quiz-backend
         run: |
-          docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/myquizapp-backend:latest .
+          docker build --no-cache -t ${{ secrets.DOCKERHUB_USERNAME }}/myquizapp-backend:latest .
           docker push ${{ secrets.DOCKERHUB_USERNAME }}/myquizapp-backend:latest
 
-      - name: 🏗️ Build & push frontend image
+      - name: Build & push frontend image
         working-directory: My-Quiz-App/quiz_frontend
         run: |
-          docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/myquizapp-frontend:latest .
+          docker build --no-cache -t ${{ secrets.DOCKERHUB_USERNAME }}/myquizapp-frontend:latest .
           docker push ${{ secrets.DOCKERHUB_USERNAME }}/myquizapp-frontend:latest
 
   deploy-to-azure-vm:
@@ -43,53 +43,54 @@ jobs:
       VM_HOST: ${{ secrets.AZURE_VM_HOST }}
       VM_USER: ${{ secrets.AZURE_VM_USERNAME }}
     steps:
-      - name: 🔑 Start SSH agent
+      - name: Start SSH agent
         uses: webfactory/ssh-agent@v0.9.0
         with:
           ssh-private-key: ${{ secrets.AZURE_VM_SSH_KEY }}
 
-      - name: 🚀 Deploy to Azure VM
+      - name: Deploy to Azure VM
         run: |
           ssh -o StrictHostKeyChecking=no $VM_USER@$VM_HOST << EOF
             set -e
             echo "=============================="
-            echo "📦 Starting Deployment Process"
+            echo "Starting Deployment Process"
             echo "=============================="
 
-            # ✅ Ensure writable project directory
             mkdir -p /home/$VM_USER/projects
             sudo chown -R $VM_USER:$VM_USER /home/$VM_USER/projects
             cd /home/$VM_USER/projects
 
-            # ✅ Clone or update repo
             if [ ! -d "Multi-service-Containerization-App" ]; then
-              echo "🆕 Cloning repository..."
+              echo "Cloning repository for the first time..."
               git clone https://github.com/pateriyadeepali/Multi-service-Containerization-App.git
             else
-              echo "🔄 Updating repository..."
+              echo "Updating existing repository..."
               cd Multi-service-Containerization-App
-              git reset --hard
+              git fetch --all
+              git reset --hard origin/main
               git pull origin main
             fi
 
             cd /home/$VM_USER/projects/Multi-service-Containerization-App/My-Quiz-App
 
-            echo "🧹 Cleaning old Docker resources..."
-            sudo docker system prune -af || true
+            echo "Stopping and removing existing containers..."
+            sudo docker compose down || true
 
-            echo "⬇️ Pulling latest images..."
+            echo "Removing unused images..."
+            sudo docker image prune -a -f || true
+
+            echo "Pulling the latest images from Docker Hub..."
             sudo docker compose pull
 
-            echo "🚀 Recreating containers..."
-            sudo docker compose up -d --remove-orphans
+            echo "Starting containers with latest images..."
+            sudo docker compose up -d --remove-orphans --force-recreate
 
-            echo "✅ Containers running:"
+            echo "Listing running containers..."
             sudo docker ps --format "table {{.Names}}\t{{.Image}}\t{{.Status}}\t{{.Ports}}"
 
-            echo "📝 Logging deployment timestamp..."
             mkdir -p /home/$VM_USER/deploy-logs
             echo "Deployment completed at: $(date)" >> /home/$VM_USER/deploy-logs/deploy-$(date +'%Y%m%d-%H%M').log
 
-            echo "🎯 Deployment Successful!"
+            echo "Deployment Successful"
             echo "=============================="
           EOF
