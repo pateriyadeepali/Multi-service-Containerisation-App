@@ -12,7 +12,7 @@ jobs:
   build-and-push:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout code
+      - name: Checkout repository
         uses: actions/checkout@v4
 
       - name: Set up Docker Buildx
@@ -24,17 +24,23 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
+      # Build backend
       - name: Build and push backend image
         working-directory: My-Quiz-App/quiz-backend
         run: |
-          docker build --no-cache -t ${{ secrets.DOCKERHUB_USERNAME }}/myquizapp-backend:latest .
-          docker push ${{ secrets.DOCKERHUB_USERNAME }}/myquizapp-backend:latest
+          docker build --no-cache -t ${{ secrets.DOCKERHUB_USERNAME }}/my-quiz-app-backend:latest .
+          docker push ${{ secrets.DOCKERHUB_USERNAME }}/my-quiz-app-backend:latest
 
-      - name: Build and push frontend image (force rebuild)
+      # Build frontend (force rebuild)
+      - name: Build and push frontend image (Flutter)
         working-directory: My-Quiz-App/quiz_frontend
         run: |
-          docker build --no-cache -t ${{ secrets.DOCKERHUB_USERNAME }}/myquizapp-frontend:latest .
-          docker push ${{ secrets.DOCKERHUB_USERNAME }}/myquizapp-frontend:latest
+          echo "Cleaning old Flutter build and cache..."
+          flutter clean || true
+          docker builder prune -af || true
+          echo "Building new Docker image for Flutter frontend..."
+          docker build --no-cache -t ${{ secrets.DOCKERHUB_USERNAME }}/my-quiz-app-frontend:latest .
+          docker push ${{ secrets.DOCKERHUB_USERNAME }}/my-quiz-app-frontend:latest
 
   deploy-to-azure-vm:
     needs: build-and-push
@@ -48,49 +54,40 @@ jobs:
         with:
           ssh-private-key: ${{ secrets.AZURE_VM_SSH_KEY }}
 
-      - name: Deploy to Azure VM
+      - name: Deploy latest version to Azure VM
         run: |
-          ssh -o StrictHostKeyChecking=no $VM_USER@$VM_HOST << EOF
+          ssh -o StrictHostKeyChecking=no $VM_USER@$VM_HOST << 'EOF'
             set -e
-            echo "=============================="
-            echo "Starting Deployment Process"
-            echo "=============================="
+            echo "Starting Deployment Process..."
 
             # Ensure writable project directory
             mkdir -p /home/$VM_USER/projects
             sudo chown -R $VM_USER:$VM_USER /home/$VM_USER/projects
             cd /home/$VM_USER/projects
 
-            # Clone or update repository
+            # Clone or update repo
             if [ ! -d "Multi-service-Containerization-App" ]; then
               echo "Cloning repository..."
               git clone https://github.com/pateriyadeepali/Multi-service-Containerization-App.git
             else
               echo "Updating repository..."
               cd Multi-service-Containerization-App
-              git reset --hard
-              git pull origin main
+              git fetch origin main
+              git reset --hard origin/main
             fi
 
             cd /home/$VM_USER/projects/Multi-service-Containerization-App/My-Quiz-App
 
-            echo "Cleaning old Docker resources..."
+            echo "Cleaning old containers and pulling latest images..."
+            sudo docker compose down || true
             sudo docker system prune -af || true
-
-            echo "Pulling latest images..."
             sudo docker compose pull
 
-            echo "Recreating containers..."
-            sudo docker compose up -d --remove-orphans --force-recreate
+            echo "Starting new containers..."
+            sudo docker compose up -d --force-recreate
 
-            echo "Containers running:"
+            echo "Listing all active containers..."
             sudo docker ps --format "table {{.Names}}\t{{.Image}}\t{{.Status}}\t{{.Ports}}"
 
-            echo "Logging deployment timestamp..."
-            mkdir -p /home/$VM_USER/deploy-logs
-            echo "Deployment completed at: $(date)" >> /home/$VM_USER/deploy-logs/deploy-$(date +'%Y%m%d-%H%M').log
-
-            echo "Deployment Successful"
-            echo "=============================="
+            echo "Deployment completed successfully at $(date)"
           EOF
-          
