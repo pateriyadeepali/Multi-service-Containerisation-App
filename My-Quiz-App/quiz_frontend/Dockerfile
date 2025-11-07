@@ -1,3 +1,4 @@
+# Stage 1: Flutter Build
 FROM debian:bookworm-slim AS build
 
 RUN apt-get update && apt-get install -y \
@@ -9,33 +10,28 @@ WORKDIR /flutter
 RUN git clone https://github.com/flutter/flutter.git -b stable
 ENV PATH="/flutter/flutter/bin:/flutter/flutter/bin/cache/dart-sdk/bin:${PATH}"
 
-# Run basic Flutter setup
+# Verify installation
 RUN flutter doctor -v
 
-# Set working directory for your app
+# Set working directory for the app
 WORKDIR /app
 
-# Copy your Flutter app
+# Copy all source files (force rebuild each time)
 COPY . .
 
-# Clean & rebuild to ensure latest code
+# Force Flutter to clean & rebuild every time
 RUN flutter clean
 RUN flutter pub get
+RUN flutter build web --release --no-tree-shake-icons --verbose
 
-#  Optional — Print your baseUrl for debugging
-RUN grep "baseUrl" lib/api_service.dart || true
-
-# Build Flutter web release
-RUN flutter build web --release
-
-# Stage 2 — Nginx Web Server
+# Stage 2: Nginx Server
 FROM nginx:alpine
 
-# Copy built web files from Flutter stage
+# Clear Nginx default HTML and copy new Flutter build
+RUN rm -rf /usr/share/nginx/html/*
 COPY --from=build /app/build/web /usr/share/nginx/html
 
-# Expose Nginx port
+# Expose port 80 for serving
 EXPOSE 80
 
-# Start Nginx
 CMD ["nginx", "-g", "daemon off;"]
