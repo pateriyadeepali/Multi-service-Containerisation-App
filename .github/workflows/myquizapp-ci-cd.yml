@@ -11,6 +11,7 @@ on:
 jobs:
   build-and-push:
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -30,14 +31,11 @@ jobs:
           docker build --no-cache -t ${{ secrets.DOCKERHUB_USERNAME }}/myquizapp-backend:latest .
           docker push ${{ secrets.DOCKERHUB_USERNAME }}/myquizapp-backend:latest
 
-      - - name: Build & push frontend image
-  working-directory: My-Quiz-App/quiz_frontend
-  run: |
-    flutter clean || true
-    docker builder prune -af || true
-    docker build --no-cache -t ${{ secrets.DOCKERHUB_USERNAME }}/my-quiz-app-frontend:latest .
-    docker push ${{ secrets.DOCKERHUB_USERNAME }}/my-quiz-app-frontend:latest
-
+      - name: Build and push frontend image
+        working-directory: My-Quiz-App/quiz_frontend
+        run: |
+          docker build --no-cache -t ${{ secrets.DOCKERHUB_USERNAME }}/myquizapp-frontend:latest .
+          docker push ${{ secrets.DOCKERHUB_USERNAME }}/myquizapp-frontend:latest
 
   deploy-to-azure-vm:
     needs: build-and-push
@@ -45,6 +43,7 @@ jobs:
     env:
       VM_HOST: ${{ secrets.AZURE_VM_HOST }}
       VM_USER: ${{ secrets.AZURE_VM_USERNAME }}
+
     steps:
       - name: Start SSH agent
         uses: webfactory/ssh-agent@v0.9.0
@@ -55,24 +54,28 @@ jobs:
         run: |
           ssh -o StrictHostKeyChecking=no $VM_USER@$VM_HOST << EOF
             set -e
-            echo "=============================="
-            echo "Starting Deployment Process"
-            echo "=============================="
+            echo "================================="
+            echo "Starting Deployment Process..."
+            echo "================================="
 
-            # Ensure writable project directory
+            if [ -z "$VM_USER" ]; then
+              echo "ERROR: VM_USER is empty. Check AZURE_VM_USERNAME secret."
+              exit 1
+            fi
+
+            echo "Ensuring project directory..."
             mkdir -p /home/$VM_USER/projects
             sudo chown -R $VM_USER:$VM_USER /home/$VM_USER/projects
             cd /home/$VM_USER/projects
 
-            # Clone or update repository
             if [ ! -d "Multi-service-Containerization-App" ]; then
               echo "Cloning repository..."
               git clone https://github.com/pateriyadeepali/Multi-service-Containerization-App.git
             else
               echo "Updating repository..."
               cd Multi-service-Containerization-App
-              git reset --hard
-              git pull origin main
+              git fetch origin main
+              git reset --hard origin/main
             fi
 
             cd /home/$VM_USER/projects/Multi-service-Containerization-App/My-Quiz-App
@@ -86,13 +89,14 @@ jobs:
             echo "Recreating containers..."
             sudo docker compose up -d --remove-orphans --force-recreate
 
-            echo "Containers running:"
+            echo "Checking running containers..."
             sudo docker ps --format "table {{.Names}}\t{{.Image}}\t{{.Status}}\t{{.Ports}}"
 
-            echo "Logging deployment timestamp..."
+            echo "Logging deployment completion..."
             mkdir -p /home/$VM_USER/deploy-logs
             echo "Deployment completed at: $(date)" >> /home/$VM_USER/deploy-logs/deploy-$(date +'%Y%m%d-%H%M').log
 
-            echo "Deployment Successful"
-            echo "=============================="
+            echo "================================="
+            echo "Deployment Successful."
+            echo "================================="
           EOF
