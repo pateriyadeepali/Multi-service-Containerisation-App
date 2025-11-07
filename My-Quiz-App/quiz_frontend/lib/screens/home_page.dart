@@ -72,7 +72,7 @@ class _HomePageState extends State<HomePage> {
           ),
           const SizedBox(height: 8),
           const Text(
-            "Test your knowledge or create your own quizzes!",
+            "Test your knowledge or create quizzes!",
             style: TextStyle(fontSize: 16, color: Colors.black54),
           ),
           const SizedBox(height: 20),
