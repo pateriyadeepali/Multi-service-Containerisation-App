@@ -2,30 +2,33 @@ version: "3.9"
 
 services:
   couchdb:
-    image: couchdb:3
+    image: couchdb:3.3
     container_name: couchdb
     restart: unless-stopped
     environment:
-      - COUCHDB_USER=admin
-      - COUCHDB_PASSWORD=password
+      COUCHDB_USER: admin
+      COUCHDB_PASSWORD: password
     ports:
       - "5984:5984"
     volumes:
-      - couchdb_data:/opt/couchdb/data
+      - couchdb_data:/opt/couchdb/data    
     networks:
       - reactdb_net
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:5984/"]
-      interval: 5s
+      interval: 10s
       retries: 10
       start_period: 10s
 
   backend:
-    image: react-node-backend
+    image: deepali2712/react-node-couchdb-backend:latest
     container_name: backend
     restart: unless-stopped
-    env_file:
-      - ./backend/.env
+    environment:
+      - PORT=5000
+      - COUCHDB_URL=http://couchdb:5984
+      - COUCHDB_USER=admin
+      - COUCHDB_PASSWORD=password
     ports:
       - "5000:5000"
     depends_on:
@@ -35,15 +38,13 @@ services:
       - reactdb_net
 
   frontend:
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile
+    image: deepali2712/react-node-couchdb-frontend:latest
     container_name: frontend
     restart: unless-stopped
-    env_file:
-      - ./frontend/.env
+    environment:
+      - REACT_APP_API_URL=http://backend:5000
     ports:
-      - "3000:80"
+      - "80:80"
     depends_on:
       - backend
     networks:
@@ -51,6 +52,8 @@ services:
 
 volumes:
   couchdb_data:
+    external: true
+    name: react-node-couchdb_couchdb-data   
 
 networks:
   reactdb_net:
