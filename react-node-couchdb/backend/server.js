@@ -10,7 +10,12 @@ const port = process.env.PORT || 5000;
 // 1. CORS middleware first
 const allowedOrigins = [
   "http://localhost:3000",       // local dev
-  "http://192.168.0.178:3000"    // LAN access
+  "http://192.168.0.178:3000", 
+  "http://backend:5000",            // internal Docker call
+  "http://frontend",                // Docker service name
+  "http://frontend:80",             // Nginx inside Docker
+  "http://172.188.96.249",     // external Azure IP (we’ll replace below)
+  "http://172.188.96.249:80"   // explicit port if needed   // LAN access
 ];
 
 app.use(cors({
