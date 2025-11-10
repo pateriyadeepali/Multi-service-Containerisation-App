@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import "./App.css";
 
-const API_URL = process.env.REACT_APP_API_URL || "http://backend:5000";
+const API_URL = process.env.REACT_APP_API_URL;
 
 function App() {
   const [bookName, setBookName] = useState("");
