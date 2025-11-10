@@ -63,21 +63,16 @@ jobs:
           ssh -o StrictHostKeyChecking=no $VM_USER@$VM_HOST << EOF
             set -e
 
-            if [ -z "$VM_USER" ]; then
-              echo "ERROR: VM_USER is empty. Check AZURE_VM2_USERNAME secret."
-              exit 1
-            fi
-
-            echo "Logged in as: $(whoami)"
-            echo "Current working directory: $(pwd)"
+            echo "Logged in as: \$(whoami)"
+            echo "Current working directory: \$(pwd)"
             echo "Starting deployment process..."
 
-            PROJECT_DIR="/home/$VM_USER/projects/Multi-service-Containerization-App/react-node-couchdb"
-            REPO_DIR="/home/$VM_USER/projects/Multi-service-Containerization-App"
+            PROJECT_DIR="/home/\$(whoami)/projects/Multi-service-Containerization-App/react-node-couchdb"
+            REPO_DIR="/home/\$(whoami)/projects/Multi-service-Containerization-App"
 
             echo "Ensuring project directory..."
-            mkdir -p /home/$VM_USER/projects
-            cd /home/$VM_USER/projects
+            mkdir -p /home/\$(whoami)/projects
+            cd /home/\$(whoami)/projects
 
             if [ ! -d "Multi-service-Containerization-App" ]; then
               echo "Cloning repository..."
@@ -87,21 +82,22 @@ jobs:
               cd Multi-service-Containerization-App
               git fetch origin main
               git reset --hard origin/main
+              cd ..
             fi
 
             echo "Navigating to project folder..."
-            if [ -d "$REPO_DIR/react-node-couchdb" ]; then
-              cd "$REPO_DIR/react-node-couchdb"
+            if [ -d "\$REPO_DIR/react-node-couchdb" ]; then
+              cd "\$REPO_DIR/react-node-couchdb"
             else
-              echo "ERROR: react-node-couchdb folder not found inside $REPO_DIR"
+              echo "ERROR: react-node-couchdb folder not found inside \$REPO_DIR"
               echo "Available folders:"
-              ls -l "$REPO_DIR"
+              ls -l "\$REPO_DIR" || true
               exit 1
             fi
 
             echo "Confirming docker-compose.yml file exists..."
             if [ ! -f "docker-compose.yml" ]; then
-              echo "ERROR: docker-compose.yml not found in $(pwd)"
+              echo "ERROR: docker-compose.yml not found in \$(pwd)"
               exit 1
             fi
 
@@ -128,8 +124,8 @@ jobs:
             sudo docker ps --format "table {{.Names}}\t{{.Image}}\t{{.Status}}\t{{.Ports}}"
 
             echo "Logging deployment..."
-            mkdir -p /home/$VM_USER/deploy-logs
-            echo "Deployment completed at: \$(date)" >> /home/$VM_USER/deploy-logs/deploy-\$(date +'%Y%m%d-%H%M').log
+            mkdir -p /home/\$(whoami)/deploy-logs
+            echo "Deployment completed at: \$(date)" >> /home/\$(whoami)/deploy-logs/deploy-\$(date +'%Y%m%d-%H%M').log
 
-            echo "Deployment successful on VM2."
+            echo "Deployment successful on Azure VM2."
           EOF
